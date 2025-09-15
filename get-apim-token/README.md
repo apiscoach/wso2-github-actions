@@ -19,6 +19,7 @@ A reusable GitHub Action that registers an OAuth2 client and obtains an access t
 | `admin_password` | WSO2 APIM admin password | Yes | - |
 | `client_name` | OAuth2 client name for registration | No | `github_actions_client` |
 | `scopes` | OAuth2 scopes to request | No | `apim:api_publish apim:api_view` |
+| `owner` | Application owner for the OAuth2 client | No | `admin` |
 
 ## Outputs
 
@@ -59,7 +60,7 @@ A reusable GitHub Action that registers an OAuth2 client and obtains an access t
     admin_username: ${{ secrets.WSO2_APIM_ADMIN_USERNAME }}
     admin_password: ${{ secrets.WSO2_APIM_ADMIN_PASSWORD }}
     client_name: "my_custom_client"
-    scopes: "apim:api_publish apim:api_view apim:admin"
+    scopes: "apim:api_publish apim:api_manage apim:api_import_export"
 
 - name: Change API Lifecycle State
   run: |

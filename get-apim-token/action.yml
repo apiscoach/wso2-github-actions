@@ -1,6 +1,6 @@
 name: 'Get WSO2 APIM OAuth Token'
 description: 'Registers an OAuth2 client and obtains an access token for WSO2 APIM API operations'
-author: 'WSO2'
+author: 'APIs Coach'
 
 inputs:
   apim_base_url:
@@ -20,6 +20,10 @@ inputs:
     description: 'OAuth2 scopes to request'
     required: false
     default: 'apim:api_publish apim:api_view'
+  owner:
+    description: 'Application owner for the OAuth2 client'
+    required: false
+    default: 'admin'
 
 outputs:
   access_token:
@@ -44,6 +48,7 @@ runs:
           -d '{
             "callbackUrl": "www.google.lk",
             "clientName": "${{ inputs.client_name }}",
+            "owner": "${{ inputs.owner }}",
             "grantType": "client_credentials password refresh_token",
             "saasApp": true
           }' \
