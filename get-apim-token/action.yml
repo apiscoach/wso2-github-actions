@@ -1,0 +1,91 @@
+name: 'Get WSO2 APIM OAuth Token'
+description: 'Registers an OAuth2 client and obtains an access token for WSO2 APIM API operations'
+author: 'WSO2'
+
+inputs:
+  apim_base_url:
+    description: 'WSO2 APIM base URL'
+    required: true
+  admin_username:
+    description: 'WSO2 APIM admin username'
+    required: true
+  admin_password:
+    description: 'WSO2 APIM admin password'
+    required: true
+  client_name:
+    description: 'OAuth2 client name for registration'
+    required: false
+    default: 'github_actions_client'
+  scopes:
+    description: 'OAuth2 scopes to request'
+    required: false
+    default: 'apim:api_publish apim:api_view'
+
+outputs:
+  access_token:
+    description: 'The OAuth2 access token for APIM API operations'
+    value: ${{ steps.get-token.outputs.access_token }}
+  client_id:
+    description: 'The registered OAuth2 client ID'
+    value: ${{ steps.get-token.outputs.client_id }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Get APIM OAuth Token
+      id: get-token
+      shell: bash
+      run: |
+        echo "Registering OAuth2 client..."
+
+        CLIENT_RESPONSE=$(curl -s -X POST \
+          -H "Authorization: Basic $(echo -n '${{ inputs.admin_username }}:${{ inputs.admin_password }}' | base64)" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "callbackUrl": "www.google.lk",
+            "clientName": "${{ inputs.client_name }}",
+            "grantType": "client_credentials password refresh_token",
+            "saasApp": true
+          }' \
+          "${{ inputs.apim_base_url }}/client-registration/v0.17/register")
+
+        CLIENT_ID=$(echo "$CLIENT_RESPONSE" | jq -r '.clientId')
+        CLIENT_SECRET=$(echo "$CLIENT_RESPONSE" | jq -r '.clientSecret')
+
+        if [ "$CLIENT_ID" == "null" ] || [ -z "$CLIENT_ID" ]; then
+          echo "Error: Failed to register OAuth2 client"
+          echo "Response: $CLIENT_RESPONSE"
+          exit 1
+        fi
+
+        echo "OAuth2 client registered successfully"
+        echo "client_id=$CLIENT_ID" >> $GITHUB_OUTPUT
+
+        echo "Getting access token..."
+
+        TOKEN_RESPONSE=$(curl -s -X POST \
+          -H "Authorization: Basic $(echo -n "$CLIENT_ID:$CLIENT_SECRET" | base64)" \
+          -H "Content-Type: application/x-www-form-urlencoded" \
+          -d "grant_type=password&username=${{ inputs.admin_username }}&password=${{ inputs.admin_password }}&scope=${{ inputs.scopes }}" \
+          "${{ inputs.apim_base_url }}/oauth2/token")
+
+        ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
+
+        if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
+          echo "Error: Failed to get access token"
+          echo "Response: $TOKEN_RESPONSE"
+          echo "TOKEN_RESPONSE content for debugging:"
+          echo "$TOKEN_RESPONSE"
+          exit 1
+        fi
+
+        echo "Access token obtained successfully"
+        echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+
+        # Clean up sensitive variables
+        unset CLIENT_SECRET
+        unset ACCESS_TOKEN
+
+branding:
+  icon: 'lock'
+  color: 'orange'

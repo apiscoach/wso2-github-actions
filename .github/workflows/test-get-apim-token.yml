@@ -1,0 +1,135 @@
+name: Test Get APIM Token Action
+
+on:
+  workflow_dispatch:
+    inputs:
+      apim_base_url:
+        description: 'WSO2 APIM Base URL (e.g., https://your-apim.com)'
+        required: true
+        type: string
+      test_api_call:
+        description: 'Test API call after getting token'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  test-token-action:
+    name: Test APIM Token Action
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Test Get APIM Token - Basic
+        id: test-basic
+        uses: ./get-apim-token
+        with:
+          apim_base_url: ${{ github.event.inputs.apim_base_url }}
+          admin_username: ${{ secrets.WSO2_APIM_ADMIN_USERNAME }}
+          admin_password: ${{ secrets.WSO2_APIM_ADMIN_PASSWORD }}
+
+      - name: Validate Token Output
+        run: |
+          echo "=== Testing Basic Token Retrieval ==="
+
+          # Check if access_token is not empty
+          if [ -z "${{ steps.test-basic.outputs.access_token }}" ]; then
+            echo "❌ ERROR: access_token output is empty"
+            exit 1
+          else
+            echo "✅ SUCCESS: access_token received (length: ${#ACCESS_TOKEN})"
+          fi
+
+          # Check if client_id is not empty
+          if [ -z "${{ steps.test-basic.outputs.client_id }}" ]; then
+            echo "❌ ERROR: client_id output is empty"
+            exit 1
+          else
+            echo "✅ SUCCESS: client_id received: ${{ steps.test-basic.outputs.client_id }}"
+          fi
+
+          echo "=== Basic validation completed successfully ==="
+        env:
+          ACCESS_TOKEN: ${{ steps.test-basic.outputs.access_token }}
+
+      - name: Test Get APIM Token - Custom Settings
+        id: test-custom
+        uses: ./get-apim-token
+        with:
+          apim_base_url: ${{ github.event.inputs.apim_base_url }}
+          admin_username: ${{ secrets.WSO2_APIM_ADMIN_USERNAME }}
+          admin_password: ${{ secrets.WSO2_APIM_ADMIN_PASSWORD }}
+          client_name: "test_action_client"
+          scopes: "apim:api_view apim:api_publish"
+
+      - name: Validate Custom Token Output
+        run: |
+          echo "=== Testing Custom Settings Token Retrieval ==="
+
+          # Check if access_token is not empty
+          if [ -z "${{ steps.test-custom.outputs.access_token }}" ]; then
+            echo "❌ ERROR: custom access_token output is empty"
+            exit 1
+          else
+            echo "✅ SUCCESS: custom access_token received (length: ${#ACCESS_TOKEN})"
+          fi
+
+          # Check if client_id is not empty
+          if [ -z "${{ steps.test-custom.outputs.client_id }}" ]; then
+            echo "❌ ERROR: custom client_id output is empty"
+            exit 1
+          else
+            echo "✅ SUCCESS: custom client_id received: ${{ steps.test-custom.outputs.client_id }}"
+          fi
+
+          echo "=== Custom settings validation completed successfully ==="
+        env:
+          ACCESS_TOKEN: ${{ steps.test-custom.outputs.access_token }}
+
+      - name: Test API Call with Token
+        if: github.event.inputs.test_api_call == 'true'
+        run: |
+          echo "=== Testing API Call with Retrieved Token ==="
+
+          # Test API call to list APIs (should work with apim:api_view scope)
+          API_RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ steps.test-basic.outputs.access_token }}" \
+            -H "Accept: application/json" \
+            "${{ github.event.inputs.apim_base_url }}/api/am/publisher/v4/apis")
+
+          HTTP_CODE=$(echo "$API_RESPONSE" | tail -n1)
+          RESPONSE_BODY=$(echo "$API_RESPONSE" | head -n -1)
+
+          echo "HTTP Status Code: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ SUCCESS: API call successful"
+            echo "Response preview: $(echo "$RESPONSE_BODY" | head -c 200)..."
+          elif [ "$HTTP_CODE" -eq 401 ]; then
+            echo "❌ ERROR: Token authentication failed (401 Unauthorized)"
+            echo "Response: $RESPONSE_BODY"
+            exit 1
+          elif [ "$HTTP_CODE" -eq 403 ]; then
+            echo "⚠️  WARNING: Token valid but insufficient permissions (403 Forbidden)"
+            echo "This might be expected based on user permissions"
+            echo "Response: $RESPONSE_BODY"
+          else
+            echo "⚠️  WARNING: Unexpected HTTP status code: $HTTP_CODE"
+            echo "Response: $RESPONSE_BODY"
+          fi
+
+      - name: Test Results Summary
+        if: always()
+        run: |
+          echo "=== Test Results Summary ==="
+          echo "✅ Token Action Test: COMPLETED"
+          echo "- Basic token retrieval: ${{ steps.test-basic.outcome }}"
+          echo "- Custom settings token retrieval: ${{ steps.test-custom.outcome }}"
+          echo "- API call test: ${{ steps.test-api-call.outcome || 'SKIPPED' }}"
+          echo ""
+          echo "🔧 Action Details:"
+          echo "- APIM Base URL: ${{ github.event.inputs.apim_base_url }}"
+          echo "- Basic Client ID: ${{ steps.test-basic.outputs.client_id }}"
+          echo "- Custom Client ID: ${{ steps.test-custom.outputs.client_id }}"
