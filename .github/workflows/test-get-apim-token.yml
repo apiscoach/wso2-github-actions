@@ -54,7 +54,7 @@ jobs:
         id: test-custom
         uses: ./get-apim-token
         with:
-          apim_base_url: ${{ github.event.inputs.apim_base_url }}
+          apim_base_url: ${{ secrets.WSO2_APIM_BASE_URL }}
           admin_username: ${{ secrets.WSO2_APIM_ADMIN_USERNAME }}
           admin_password: ${{ secrets.WSO2_APIM_ADMIN_PASSWORD }}
           client_name: "test_action_client"
@@ -93,7 +93,7 @@ jobs:
           API_RESPONSE=$(curl -s -w "\n%{http_code}" \
             -H "Authorization: Bearer ${{ steps.test-basic.outputs.access_token }}" \
             -H "Accept: application/json" \
-            "${{ github.event.inputs.apim_base_url }}/api/am/publisher/v4/apis")
+            "${{ secrets.WSO2_APIM_BASE_URL }}/api/am/publisher/v4/apis")
 
           HTTP_CODE=$(echo "$API_RESPONSE" | tail -n1)
           RESPONSE_BODY=$(echo "$API_RESPONSE" | head -n -1)
@@ -126,6 +126,6 @@ jobs:
           echo "- API call test: ${{ steps.test-api-call.outcome || 'SKIPPED' }}"
           echo ""
           echo "🔧 Action Details:"
-          echo "- APIM Base URL: ${{ github.event.inputs.apim_base_url }}"
+          echo "- APIM Base URL: ${{ secrets.WSO2_APIM_BASE_URL }}"
           echo "- Basic Client ID: ${{ steps.test-basic.outputs.client_id }}"
           echo "- Custom Client ID: ${{ steps.test-custom.outputs.client_id }}"
