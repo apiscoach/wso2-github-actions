@@ -3,10 +3,6 @@ name: Test Get APIM Token Action
 on:
   workflow_dispatch:
     inputs:
-      apim_base_url:
-        description: 'WSO2 APIM Base URL (e.g., https://your-apim.com)'
-        required: true
-        type: string
       test_api_call:
         description: 'Test API call after getting token'
         required: false
@@ -26,7 +22,7 @@ jobs:
         id: test-basic
         uses: ./get-apim-token
         with:
-          apim_base_url: ${{ github.event.inputs.apim_base_url }}
+          apim_base_url: ${{ secrets.WSO2_APIM_BASE_URL }}
           admin_username: ${{ secrets.WSO2_APIM_ADMIN_USERNAME }}
           admin_password: ${{ secrets.WSO2_APIM_ADMIN_PASSWORD }}
 
