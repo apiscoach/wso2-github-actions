@@ -42,7 +42,7 @@ runs:
       run: |
         echo "Registering OAuth2 client..."
 
-        CLIENT_RESPONSE=$(curl -s -X POST \
+        CLIENT_REGISTRATION_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST \
           -H "Authorization: Basic $(echo -n '${{ inputs.admin_username }}:${{ inputs.admin_password }}' | base64)" \
           -H "Content-Type: application/json" \
           -d '{
@@ -54,37 +54,51 @@ runs:
           }' \
           "${{ inputs.apim_base_url }}/client-registration/v0.17/register")
 
+        CLIENT_HTTP_CODE=$(echo "$CLIENT_REGISTRATION_RESPONSE" | grep "HTTP_CODE:" | cut -d: -f2)
+        CLIENT_RESPONSE=$(echo "$CLIENT_REGISTRATION_RESPONSE" | sed '/HTTP_CODE:/d')
+
+        echo "Client registration HTTP status: $CLIENT_HTTP_CODE"
+
         CLIENT_ID=$(echo "$CLIENT_RESPONSE" | jq -r '.clientId')
         CLIENT_SECRET=$(echo "$CLIENT_RESPONSE" | jq -r '.clientSecret')
 
         if [ "$CLIENT_ID" == "null" ] || [ -z "$CLIENT_ID" ]; then
           echo "Error: Failed to register OAuth2 client"
+          echo "HTTP Status Code: $CLIENT_HTTP_CODE"
           echo "Response: $CLIENT_RESPONSE"
           exit 1
         fi
 
         echo "OAuth2 client registered successfully"
+        echo "Client ID: $CLIENT_ID"
         echo "client_id=$CLIENT_ID" >> $GITHUB_OUTPUT
 
         echo "Getting access token..."
 
-        TOKEN_RESPONSE=$(curl -s -X POST \
+        TOKEN_REQUEST_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST \
           -H "Authorization: Basic $(echo -n "$CLIENT_ID:$CLIENT_SECRET" | base64)" \
           -H "Content-Type: application/x-www-form-urlencoded" \
           -d "grant_type=password&username=${{ inputs.admin_username }}&password=${{ inputs.admin_password }}&scope=${{ inputs.scopes }}" \
           "${{ inputs.apim_base_url }}/oauth2/token")
 
+        TOKEN_HTTP_CODE=$(echo "$TOKEN_REQUEST_RESPONSE" | grep "HTTP_CODE:" | cut -d: -f2)
+        TOKEN_RESPONSE=$(echo "$TOKEN_REQUEST_RESPONSE" | sed '/HTTP_CODE:/d')
+
+        echo "Token request HTTP status: $TOKEN_HTTP_CODE"
+        echo "Token response received (keys only): $(echo "$TOKEN_RESPONSE" | jq -r 'keys')"
+
         ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
 
         if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
           echo "Error: Failed to get access token"
+          echo "HTTP Status Code: $TOKEN_HTTP_CODE"
           echo "Response: $TOKEN_RESPONSE"
           echo "TOKEN_RESPONSE content for debugging:"
           echo "$TOKEN_RESPONSE"
           exit 1
         fi
 
-        echo "Access token obtained successfully"
+        echo "Access token obtained successfully (first 20 chars): ${ACCESS_TOKEN:0:20}..."
         echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
 
         # Clean up sensitive variables
